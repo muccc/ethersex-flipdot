@@ -1,0 +1,2 @@
+dep_bool_menu "Flipdot" FLIPDOT_SUPPORT $ARCH_AVR
+endmenu

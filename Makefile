@@ -47,6 +47,7 @@ SUBDIRS += hardware/zacwire
 SUBDIRS += hardware/ultrasonic
 SUBDIRS += hardware/serial_ram/23k256
 SUBDIRS += hardware/hbridge
+SUBDIRS += hardware/flipdot
 SUBDIRS += protocols/artnet
 SUBDIRS += protocols/bootp
 SUBDIRS += protocols/dali

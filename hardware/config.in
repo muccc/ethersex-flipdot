@@ -31,3 +31,4 @@ source hardware/zacwire/config.in
 source hardware/ultrasonic/config.in
 source hardware/hbridge/config.in
 source hardware/serial_ram/config.in
+source hardware/flipdot/config.in

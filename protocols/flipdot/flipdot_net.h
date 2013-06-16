@@ -22,7 +22,16 @@
 #ifndef FLIPDOT_NET_H
 #define FLIPDOT_NET_H
 
+#if 0
+struct flipdot_packet
+{
+    uint8_t panel_number;
+    uint8_t command;
+	uint8_t frame[16*20];
+}__attribute__((packed));
+#endif
+
 void flipdot_net_init(void);
-void flipdot_net_main(void);
+void flipdot_net_data(void);
 
 #endif /* FLIPDOT_NET_H */

@@ -23,23 +23,13 @@
 #include "flipdot_net.h"
 #include "protocols/uip/uip.h"
 #include "protocols/uip/uip_router.h"
-//#include "services/flipdot/flipdot.h"
+#include "hardware/flipdot/flipdot.h"
 #include "core/portio/portio.h"
 
 #include "config.h"
 
 #include <util/delay.h>
-#include <avr/io.h>
 #include <stdint.h>
-
-#define BUF ((struct uip_udpip_hdr *) (uip_appdata - UIP_IPUDPH_LEN))
-
-struct flipdot_packet
-{
-    uint8_t panel_number;
-    uint8_t command;
-	uint8_t frame[16*20];
-}__attribute__((packed));
 
 void
 flipdot_net_init (void)
@@ -47,7 +37,7 @@ flipdot_net_init (void)
     uip_ipaddr_t ip;
     uip_ipaddr_copy(&ip, all_ones_addr);
 
-    uip_udp_conn_t *udp_conn = uip_udp_new(&ip, 0, flipdot_net_main);
+    uip_udp_conn_t *udp_conn = uip_udp_new(&ip, 0, flipdot_net_data);
 
     if (!udp_conn) {
 	    return;
@@ -55,32 +45,23 @@ flipdot_net_init (void)
 
     uip_udp_bind(udp_conn, HTONS(FLIPDOT_PORT));
 
-    DDRB |= (1<<PB0);
-    PORTB |= (1<<PB0);
+    flipdot_init();
 }
 
 
 void
-flipdot_net_main(void)
+flipdot_net_data(void)
 {
-    static uint8_t index = 0;
-
     if (!uip_newdata()) {
 	    return;
     }
 
-    uip_slen = 0;
-    uint16_t len = uip_len;
     uint8_t buffer[uip_len];
     memcpy(buffer, uip_appdata, uip_len);
-
-    struct flipdot_packet* packet = (struct flipdot_packet*)buffer;
-    if (buffer[0]-index != 1 &&
-        !(index == 0xff && buffer[0] == 0x00)) {
-        PORTB ^= (1<<PB0);
-    }
-    index = buffer[0];
-    _delay_ms(10);
+    
+    //struct flipdot_packet* packet = (struct flipdot_packet*)buffer;
+    
+    flipdot_data(buffer, uip_len);
 }
 
 /*
