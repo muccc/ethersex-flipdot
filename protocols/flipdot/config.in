@@ -1,0 +1,3 @@
+dep_bool_menu "Flipdot: UDP Protocol" FLIPDOT_PROTOCOL_SUPPORT $UDP_SUPPORT
+	int "UDP Port" FLIPDOT_PORT 2704 $UDP_SUPPORT
+endmenu
