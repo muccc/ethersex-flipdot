@@ -41,7 +41,7 @@
 #define CLK_ROW  (1<<PC5) //output 6
 
 #define CLK_DELAY  2			/* us */
-#define FLIP_DELAY 5			/* ms */
+#define FLIP_DELAY 2			/* ms */
 #define STROBE_DELAY 2			/* us */
 //#define LINE_DELAY 2			/* ms */
 
