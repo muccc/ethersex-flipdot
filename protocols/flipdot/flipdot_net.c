@@ -31,6 +31,16 @@
 #include <util/delay.h>
 #include <stdint.h>
 
+static uint8_t flipper[256];
+
+static uint8_t reverse(uint8_t b)
+{
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    return b;
+}
+
 void
 flipdot_net_init (void)
 {
@@ -46,6 +56,11 @@ flipdot_net_init (void)
     uip_udp_bind(udp_conn, HTONS(FLIPDOT_PORT));
 
     flipdot_init();
+
+    uint16_t i = 0;
+    for(i=0; i<256; i++) {
+        flipper[i] = reverse(i);
+    }
 }
 
 
@@ -57,7 +72,12 @@ flipdot_net_data(void)
     }
 
     uint8_t buffer[uip_len];
-    memcpy(buffer, uip_appdata, uip_len);
+    uint8_t i;
+    for(i=0; i<uip_len; i++) {
+        uint8_t c = ((uint8_t *)uip_appdata)[i];
+        buffer[i] = flipper[c];
+    }
+    //memcpy(buffer, uip_appdata, uip_len);
     
     //struct flipdot_packet* packet = (struct flipdot_packet*)buffer;
     
