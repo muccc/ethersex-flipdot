@@ -103,11 +103,6 @@ flipdot_data(uint8_t *frames, uint16_t size)
 #endif
 }
 
-
-void write_bit(uint8_t *byte, int pos, uint8_t bit) {
-	*(byte + pos/8) |= (bit << pos%8);
-}
-
 void display_frame(uint8_t *data) {
 	uint8_t row_select[DISP_ROWS/8];
 	
@@ -117,7 +112,7 @@ void display_frame(uint8_t *data) {
 		for (int i = 0; i < DISP_ROWS/8; ++i) { /* Clear row_select */
 			row_select[i] = 0;
 		}
-		SETBIT(row_select, row); /* Set selected row */
+		SETBIT(row_select, row);			   /* Set selected row */
 		sreg_fill(COL, DISP_ROWS, row_select); /* Fill row select shift register */
 		
 		sreg_fill(ROW, DISP_COLS, row_data); /* Fill row data shift register */
