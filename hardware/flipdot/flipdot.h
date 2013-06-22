@@ -24,6 +24,36 @@
 
 #include <stdint.h>
 
+#ifndef F_CPU
+#define F_CPU 16000000
+#endif
+
+enum sreg {
+	ROW,
+	COL
+};
+
+#define DATA_COL (1<<PC6) //output 7
+#define DATA_ROW (1<<PC0) //output 1
+#define STROBE   (1<<PC1) //output 2
+
+#define OE_WHITE (1<<PC2) //output 3
+#define OE_BLACK (1<<PC3) //output 4
+
+#define CLK_COL  (1<<PC4) //output 5
+#define CLK_ROW  (1<<PC5) //output 6
+
+#define CLK_DELAY  1			/* us */
+#define FLIP_DELAY 2			/* ms */
+#define STROBE_DELAY 1			/* us */
+//#define LINE_DELAY 2			/* ms */
+
+#define DISP_COLS   24 + 20
+#define MODULE_COLS 20
+#define DISP_ROWS   16
+
+#define ROW_GAP 4
+
 void flipdot_init(void);
 void flipdot_data(uint8_t *frames, uint16_t size);
 

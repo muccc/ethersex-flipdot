@@ -22,38 +22,11 @@
 #include "flipdot.h"
 #include "config.h"
 
-#ifndef F_CPU
-#define F_CPU 16000000
-#endif
-
 #include <util/delay.h>
 #include <avr/io.h>
 #include <stdint.h>
-
-#define DATA_COL (1<<PC6) //output 7
-#define DATA_ROW (1<<PC0) //output 1
-#define STROBE   (1<<PC1) //output 2
-
-#define OE_WHITE (1<<PC3) //output 4
-#define OE_BLACK (1<<PC2) //output 3
-
-#define CLK_COL  (1<<PC4) //output 5
-#define CLK_ROW  (1<<PC5) //output 6
-
-#define CLK_DELAY  2			/* us */
-#define FLIP_DELAY 2			/* ms */
-#define STROBE_DELAY 2			/* us */
-//#define LINE_DELAY 2			/* ms */
-
-#define DISP_COLS   24 + 20
-#define DISP_ROWS   16
-
-//#define FRAME_DELAY 0
-
-enum sreg {
-	ROW,
-	COL
-};
+#include <string.h>
+#include <stdbool.h>
 
 #define ISBITSET(x,i) ((x[i>>3] & (1<<(i&7)))!=0)
 #define SETBIT(x,i) x[i>>3]|=(1<<(i&7));
@@ -66,19 +39,39 @@ enum sreg {
 #define OE(reg)									\
 	((reg == ROW) ? OE_ROW : OE_COL)
 
-void sreg_push_bit(enum sreg reg, uint8_t bit);
-void sreg_fill(enum sreg reg, int count, uint8_t *data);
+#define LEN(a)									\
+	(sizeof(a)/sizeof(a[0]))
 
-void strobe(void);
-void flip_pixels(void);
+static uint8_t buffer_a[2*MODULE_COLS*DISP_ROWS/8];
+static uint8_t buffer_b[2*MODULE_COLS*DISP_ROWS/8];
+static uint8_t buffer_to_0[2*MODULE_COLS*DISP_ROWS/8];
+static uint8_t buffer_to_1[2*MODULE_COLS*DISP_ROWS/8];
+static uint8_t *buffer_new, *buffer_old;
 
-void display_frame(uint8_t *row_data);
+static void sreg_push_bit(enum sreg reg, uint8_t bit);
+static void sreg_fill(enum sreg reg, uint8_t *data, int count);
+static void sreg_fill_row(uint8_t *data, int count);
+static void sreg_fill_col(uint8_t *data, int count);
 
+static void strobe(void);
+static void flip_pixels(void);
+static void flip_white(void);
+static void flip_black(void);
+
+static void buffer_diff_to_0(uint8_t old[], uint8_t new[], uint8_t diff[]);
+static void buffer_diff_to_1(uint8_t old[], uint8_t new[], uint8_t diff[]);
+
+static void display_frame_differential(uint8_t *to_0, uint8_t *to_1);
+static void display_frame_integral(uint8_t *row_data);
 
 void
 flipdot_init(void)
 {
-	// init ports
+	/* Init buffer pointers */
+	buffer_new = buffer_a;
+	buffer_old = buffer_b;
+	
+	/* init ports */
 	DDRC  |=  (DATA_COL|STROBE|OE_WHITE|OE_BLACK|CLK_ROW|CLK_COL|DATA_ROW);
 	PORTC &= ~(DATA_COL|STROBE|OE_WHITE|OE_BLACK|CLK_ROW|CLK_COL|DATA_ROW);
 
@@ -87,23 +80,70 @@ flipdot_init(void)
 }
 
 void
-flipdot_data(uint8_t *frames, uint16_t size)
+flipdot_data(uint8_t *frame, uint16_t size)
 {
+	uint8_t *tmp;
+	static bool initialized = false;
+	
+	memcpy(buffer_old, frame, size); /* Copy frame into buffer with old data */
 
-    display_frame(frames);
-#if 0    
-    static uint8_t index;
-
-    if (frames[0]-index != 1 &&
-        !(index == 0xff && frames[0] == 0x00)) {
-        PORTB ^= (1<<PB0);
-    }
-    index = frames[0];
-    _delay_ms(10);
-#endif
+	tmp = buffer_old;				 /* swap pointers buffer_new and buffer_old */
+	buffer_old = buffer_new;
+	buffer_new = tmp;
+	
+	if (!initialized) {
+		display_frame_integral(frame);
+		initialized = true;
+	} else {
+		buffer_diff_to_0(buffer_old, buffer_new, buffer_to_0);
+		buffer_diff_to_1(buffer_old, buffer_new, buffer_to_1);
+		display_frame_differential(buffer_to_0, buffer_to_1);
+	}
 }
 
-void display_frame(uint8_t *data) {
+static void
+buffer_diff_to_0(uint8_t old[], uint8_t new[], uint8_t diff[])
+{
+	for (int i = 0; i < 40*16/8; ++i) {
+		/* ~ because of the change to black is triggerd by the inverse
+		 * signal of change to white */
+		diff[i] = ~(~old[i] & new[i]);
+	}
+}
+
+static void
+buffer_diff_to_1(uint8_t old[], uint8_t new[], uint8_t diff[])
+{
+	for (int i = 0; i < 40*16/8; ++i) {
+		diff[i] = old[i] & ~new[i];
+	}
+}
+
+static void
+display_frame_differential(uint8_t *to_0, uint8_t *to_1)
+{
+	uint8_t row_select[DISP_ROWS/8];
+
+	for (int row = 0; row < DISP_ROWS; ++row) {
+		uint8_t *row_data_to_0 = to_0 + row * (DISP_COLS-4)/8; /* -4 should be +4 above */
+		uint8_t *row_data_to_1 = to_1 + row * (DISP_COLS-4)/8; /* -4 should be +4 above */
+		memcpy(row_select, 0, DISP_ROWS/8);
+		SETBIT(row_select, row);			   /* Set selected row */
+		sreg_fill(COL, row_select, DISP_ROWS); /* Fill row select shift register */
+		
+		sreg_fill(ROW, row_data_to_0, DISP_COLS); /* Fill row to 0 shift register */
+		strobe();
+		flip_black();
+
+		sreg_fill(ROW, row_data_to_1, DISP_COLS); /* Fill row to 1 shift register */
+		strobe();
+		flip_white();
+	}
+}
+
+static void
+display_frame_integral(uint8_t *data)
+{
 	uint8_t row_select[DISP_ROWS/8];
 	
 	for (int row = 0; row < DISP_ROWS; ++row) { /* Every row */
@@ -113,18 +153,18 @@ void display_frame(uint8_t *data) {
 			row_select[i] = 0;
 		}
 		SETBIT(row_select, row);			   /* Set selected row */
-		sreg_fill(COL, DISP_ROWS, row_select); /* Fill row select shift register */
+		sreg_fill(COL, row_select, DISP_ROWS); /* Fill row select shift register */
 		
-		sreg_fill(ROW, DISP_COLS, row_data); /* Fill row data shift register */
+		sreg_fill(ROW, row_data, DISP_COLS); /* Fill row data shift register */
 		strobe();
 		flip_pixels();
-
-		/* _delay_ms(LINE_DELAY); */
 	}
 }
 
 /* Output bit on reg and pulse clk signal */
-void sreg_push_bit(enum sreg reg, uint8_t bit) {
+static void
+sreg_push_bit(enum sreg reg, uint8_t bit)
+{
 	if (bit) {
 		PORTC |= DATA(reg);			/* set data bit */
 	} else {
@@ -136,39 +176,68 @@ void sreg_push_bit(enum sreg reg, uint8_t bit) {
 	PORTC &= ~CLK(reg);			/* clk low */
 }
 
-/* Fill register reg with count bits from data LSB first */
-void sreg_fill(enum sreg reg, int count, uint8_t *data) {
-	if (reg == ROW) {
-		count -= 4;
+static void
+sreg_fill(enum sreg reg, uint8_t *data, int count)
+{
+	switch (reg) {
+		case ROW: sreg_fill_row(data, count); break;
+		case COL: sreg_fill_col(data, count); break;
 	}
+}
+
+/* Fill col register with count bits from data LSB first */
+static void
+sreg_fill_col(uint8_t *data, int count)
+{
 	int i = 0;
-	int halt_count = 0;
 	while (i < count) {
-		if (reg == ROW) {
-			if (i > 20 && halt_count < 4) {
-				++halt_count;
-				--i;
-			}
-		}
-		sreg_push_bit(reg, ISBITSET(data, i));
+		sreg_push_bit(COL, ISBITSET(data, (count-i-1)));
 		++i;
 	}
 }
 
-void strobe(void) {
+static void
+sreg_fill_row(uint8_t *data, int count)
+{
+	/* This is necessary because the row
+	 * register has 4 unmapped bits */
+	count -= ROW_GAP;
+	int i = 0;
+	int halt_count = 0;
+	while (i < count) {
+		if (i > MODULE_COLS && halt_count < ROW_GAP) {
+			++halt_count;
+			--i;
+		}
+		/* count-i-1 because the first bit needs to go last */
+		sreg_push_bit(ROW, ! ISBITSET(data, (count-i-1)));
+		++i;
+	}
+}
+
+static void
+strobe(void)
+{
 	PORTC |= STROBE;
 	_delay_us(STROBE_DELAY);
 	PORTC &= ~STROBE;
 }
 
-void flip_pixels(void) {
-	// set white pixels
+static void
+flip_white(void)
+{
 	PORTC |= (OE_WHITE);
 	PORTC &= ~(OE_BLACK);
 
 	_delay_ms(FLIP_DELAY);
 
-	// set black pixels
+	PORTC &= ~(OE_WHITE);
+	PORTC &= ~(OE_BLACK);
+}
+
+static void
+flip_black(void)
+{
 	PORTC |= (OE_BLACK);
 	PORTC &= ~(OE_WHITE);
 	
@@ -178,3 +247,9 @@ void flip_pixels(void) {
 	PORTC &= ~(OE_WHITE);
 }
 
+static void
+flip_pixels(void)
+{
+	flip_black();
+	flip_white();
+}
