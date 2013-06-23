@@ -47,11 +47,24 @@ enum sreg {
 #define FLIP_DELAY 850			/* us */
 #define STROBE_DELAY 1			/* us */
 
-#define DISP_COLS   24 + 20
+#define MODULE_COUNT 2
+
+#define MODULE_ROWS 16
 #define MODULE_COLS 20
-#define DISP_ROWS   16
+
+#define MODULE_PIXLE_COUNT (MODULE_ROWS*MODULE_COLS)
+#define MODULE_BYTE_COUNT (MODULE_PIXEL_COUNT/8)
 
 #define ROW_GAP 4
+
+#define DISP_COLS   MODULE_COUNT*MODULE_COLS
+#define DISP_ROWS   MODULE_ROWS
+
+#define REGISTER_COLS (MODULE_COUNT*MODULE_COLS + ROW_GAP)
+
+#define DISP_PIXEL_COUNT (DISP_ROWS*DISP_COLS)
+#define DISP_BYTE_COUNT (DISP_PIXEL_COUNT/8)
+
 
 void flipdot_init(void);
 void flipdot_data(uint8_t *frames, uint16_t size);

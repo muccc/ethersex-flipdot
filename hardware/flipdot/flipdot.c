@@ -42,10 +42,10 @@
 #define LEN(a)									\
 	(sizeof(a)/sizeof(a[0]))
 
-static uint8_t buffer_a[2*MODULE_COLS*DISP_ROWS/8];
-static uint8_t buffer_b[2*MODULE_COLS*DISP_ROWS/8];
-static uint8_t buffer_to_0[2*MODULE_COLS*DISP_ROWS/8];
-static uint8_t buffer_to_1[2*MODULE_COLS*DISP_ROWS/8];
+static uint8_t buffer_a[DISP_BYTE_COUNT];
+static uint8_t buffer_b[DISP_BYTE_COUNT];
+static uint8_t buffer_to_0[DISP_BYTE_COUNT];
+static uint8_t buffer_to_1[DISP_BYTE_COUNT];
 static uint8_t *buffer_new, *buffer_old;
 
 static void sreg_push_bit(enum sreg reg, uint8_t bit);
@@ -57,8 +57,10 @@ static void strobe(void);
 static void flip_white(void);
 static void flip_black(void);
 
-static void buffer_diff_to_0(uint8_t old[], uint8_t new[], uint8_t diff[]);
-static void buffer_diff_to_1(uint8_t old[], uint8_t new[], uint8_t diff[]);
+uint8_t diff_to_0(uint8_t old, uint8_t new);
+uint8_t diff_to_1(uint8_t old, uint8_t new);
+
+static void map_two_buffers(uint8_t (*fun)(uint8_t, uint8_t), uint8_t a[], uint8_t b[], uint8_t dst[], unsigned int count);
 
 static void display_frame_differential(uint8_t *to_0, uint8_t *to_1);
 
@@ -77,11 +79,11 @@ flipdot_init(void)
 	buffer_old = buffer_b;
 
 	/* Synchronize buffers and flipdot pixel state */
-	memset(buffer_new, 0xFF, 2*MODULE_COLS*DISP_ROWS/8);
-	memset(buffer_old, 0x00, 2*MODULE_COLS*DISP_ROWS/8);
-	flipdot_data(buffer_old, 2*MODULE_COLS*DISP_ROWS/8);
-	flipdot_data(buffer_old, 2*MODULE_COLS*DISP_ROWS/8);
-	flipdot_data(buffer_old, 2*MODULE_COLS*DISP_ROWS/8);
+	memset(buffer_new, 0xFF, DISP_BYTE_COUNT);
+	memset(buffer_old, 0x00, DISP_BYTE_COUNT);
+	flipdot_data(buffer_old, DISP_BYTE_COUNT);
+	flipdot_data(buffer_old, DISP_BYTE_COUNT);
+	flipdot_data(buffer_old, DISP_BYTE_COUNT);
 }
 
 void
@@ -95,25 +97,27 @@ flipdot_data(uint8_t *frame, uint16_t size)
 	buffer_old = buffer_new;
 	buffer_new = tmp;
 	
-	buffer_diff_to_0(buffer_old, buffer_new, buffer_to_0);
-	buffer_diff_to_1(buffer_old, buffer_new, buffer_to_1);
+	map_two_buffers(diff_to_0, buffer_old, buffer_new, buffer_to_0, DISP_BYTE_COUNT);
+	map_two_buffers(diff_to_1, buffer_old, buffer_new, buffer_to_1, DISP_BYTE_COUNT);
+
 	display_frame_differential(buffer_to_0, buffer_to_1);
 }
 
 static void
-buffer_diff_to_0(uint8_t old[], uint8_t new[], uint8_t diff[])
-{
-	for (int i = 0; i < 40*16/8; ++i) {
-		diff[i] = (old[i] & ~new[i]);
+map_two_buffers(uint8_t (*fun)(uint8_t, uint8_t), uint8_t a[], uint8_t b[], uint8_t dst[], unsigned int count) {
+	for (int i = 0; i < count; ++i) {
+		dst[i] = fun(a[i], b[i]);
 	}
 }
 
-static void
-buffer_diff_to_1(uint8_t old[], uint8_t new[], uint8_t diff[])
-{
-	for (int i = 0; i < 40*16/8; ++i) {
-		diff[i] = ~(~old[i] & new[i]);
-	}
+uint8_t
+diff_to_0(uint8_t old, uint8_t new) {
+	return old & ~new;
+}
+
+uint8_t
+diff_to_1(uint8_t old, uint8_t new) {
+	return ~(~old & new);
 }
 
 static void
@@ -122,18 +126,18 @@ display_frame_differential(uint8_t *to_0, uint8_t *to_1)
 	uint8_t row_select[DISP_ROWS/8];
 
 	for (int row = 0; row < DISP_ROWS; ++row) {
-		uint8_t *row_data_to_0 = to_0 + row * (DISP_COLS-4)/8; /* -4 should be +4 above */
-		uint8_t *row_data_to_1 = to_1 + row * (DISP_COLS-4)/8; /* -4 should be +4 above */
+		uint8_t *row_data_to_0 = to_0 + row * DISP_COLS/8;
+		uint8_t *row_data_to_1 = to_1 + row * DISP_COLS/8;
 		
 		memset(row_select, 0, DISP_ROWS/8);
 		SETBIT(row_select, row);			   /* Set selected row */
 		sreg_fill(COL, row_select, DISP_ROWS); /* Fill row select shift register */
 		
-		sreg_fill(ROW, row_data_to_0, DISP_COLS); /* Fill row to 0 shift register */
+		sreg_fill(ROW, row_data_to_0, REGISTER_COLS); /* Fill row to 0 shift register */
 		strobe();
 	    flip_black();
 
-		sreg_fill(ROW, row_data_to_1, DISP_COLS); /* Fill row to 1 shift register */
+		sreg_fill(ROW, row_data_to_1, REGISTER_COLS); /* Fill row to 1 shift register */
 		strobe();
 		flip_white();
 	}
@@ -174,6 +178,7 @@ sreg_fill_col(uint8_t *data, int count)
 	}
 }
 
+/* TODO: generalize for more panels */
 static void
 sreg_fill_row(uint8_t *data, int count)
 {
