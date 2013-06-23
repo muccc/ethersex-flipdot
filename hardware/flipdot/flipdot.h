@@ -44,9 +44,8 @@ enum sreg {
 #define CLK_ROW  (1<<PC5) //output 6
 
 #define CLK_DELAY  1			/* us */
-#define FLIP_DELAY 2			/* ms */
+#define FLIP_DELAY 850			/* us */
 #define STROBE_DELAY 1			/* us */
-//#define LINE_DELAY 2			/* ms */
 
 #define DISP_COLS   24 + 20
 #define MODULE_COLS 20
