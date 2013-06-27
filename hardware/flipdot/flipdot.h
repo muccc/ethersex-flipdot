@@ -57,10 +57,16 @@ enum sreg {
 
 #define ROW_GAP 4
 
-#define DISP_COLS   MODULE_COUNT*MODULE_COLS
+#define DISP_COLS   (MODULE_COUNT*MODULE_COLS)
 #define DISP_ROWS   MODULE_ROWS
 
-#define REGISTER_COLS (MODULE_COUNT*MODULE_COLS + ROW_GAP)
+#define DISP_COUNT 3
+
+								/* Total number of columns in an
+								 * assembly + the gaps of the shift
+								 * registers that are not mapped to
+								 * pixels between */
+#define REGISTER_COLS ((MODULE_COUNT*MODULE_COLS + ROW_GAP)*DISP_COUNT)
 
 #define DISP_PIXEL_COUNT (DISP_ROWS*DISP_COLS)
 #define DISP_BYTE_COUNT (DISP_PIXEL_COUNT/8)
