@@ -71,8 +71,8 @@ flipdot_init(void)
 	DDRC  |=  (DATA_COL|STROBE|OE_WHITE|OE_BLACK|CLK_ROW|CLK_COL|DATA_ROW);
 	PORTC &= ~(DATA_COL|STROBE|OE_WHITE|OE_BLACK|CLK_ROW|CLK_COL|DATA_ROW);
 
-    DDRB |= (1<<PB0);
-    PORTB |= (1<<PB0);
+	DDRB |= (1<<PB0);
+	PORTB |= (1<<PB0);
 
 	/* Init buffer pointers */
 	buffer_new = buffer_a;
@@ -93,7 +93,7 @@ flipdot_data(uint8_t *frame, uint16_t size)
 	
 	memcpy(buffer_old, frame, size); /* Copy frame into buffer with old data */
 
-	tmp = buffer_old;				 /* swap pointers buffer_new and buffer_old */
+	tmp = buffer_old;		 /* swap pointers buffer_new and buffer_old */
 	buffer_old = buffer_new;
 	buffer_new = tmp;
 	
@@ -130,14 +130,14 @@ display_frame_differential(uint8_t *to_0, uint8_t *to_1)
 		uint8_t *row_data_to_1 = to_1 + row * DISP_COLS/8;
 		
 		memset(row_select, 0, DISP_ROWS/8);
-		SETBIT(row_select, row);			   /* Set selected row */
-		sreg_fill(COL, row_select, DISP_ROWS); /* Fill row select shift register */
+		SETBIT(row_select, row);			/* Set selected row */
+		sreg_fill(COL, row_select, DISP_ROWS);		/* Fill row select shift register */
 		
-		sreg_fill(ROW, row_data_to_0, REGISTER_COLS); /* Fill row to 0 shift register */
+		sreg_fill(ROW, row_data_to_0, REGISTER_COLS);	/* Fill row to 0 shift register */
 		strobe();
-	    flip_black();
+		flip_black();
 
-		sreg_fill(ROW, row_data_to_1, REGISTER_COLS); /* Fill row to 1 shift register */
+		sreg_fill(ROW, row_data_to_1, REGISTER_COLS);	/* Fill row to 1 shift register */
 		strobe();
 		flip_white();
 	}
@@ -154,7 +154,7 @@ sreg_push_bit(enum sreg reg, uint8_t bit)
 	}
 	
 	PORTC |= CLK(reg); 			/* clk high */
-	_delay_us(CLK_DELAY);		/* Wait */
+	_delay_us(CLK_DELAY);			/* Wait */
 	PORTC &= ~CLK(reg);			/* clk low */
 }
 
