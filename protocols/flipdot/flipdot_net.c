@@ -31,7 +31,7 @@
 #include <util/delay.h>
 #include <stdint.h>
 
-static uint8_t flipper[256];
+static uint8_t flipper[512];
 
 static uint8_t reverse(uint8_t b)
 {
@@ -58,7 +58,7 @@ flipdot_net_init (void)
     flipdot_init();
 
     uint16_t i = 0;
-    for(i=0; i<256; i++) {
+    for(i=0; i<512; i++) {
         flipper[i] = reverse(i);
     }
 }

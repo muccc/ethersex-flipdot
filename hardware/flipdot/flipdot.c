@@ -126,8 +126,8 @@ display_frame_differential(uint8_t *to_0, uint8_t *to_1)
 	uint8_t row_select[DISP_ROWS/8];
 
 	for (int row = 0; row < DISP_ROWS; ++row) {
-		uint8_t *row_data_to_0 = to_0 + row * DISP_COLS/8;
-		uint8_t *row_data_to_1 = to_1 + row * DISP_COLS/8;
+		uint8_t *row_data_to_0 = to_0 + row * ((DISP_COLS+COLS_PADDING)/8);
+		uint8_t *row_data_to_1 = to_1 + row * ((DISP_COLS+COLS_PADDING)/8);
 		
 		memset(row_select, 0, DISP_ROWS/8);
 		SETBIT(row_select, row);			/* Set selected row */
@@ -178,23 +178,27 @@ sreg_fill_col(uint8_t *data, int count)
 	}
 }
 
-/* TODO: generalize for more panels */
 static void
 sreg_fill_row(uint8_t *data, int count)
 {
 	/* This is necessary because the row
 	 * register has 4 unmapped bits */
-	count -= ROW_GAP;
-	int i = 0;
+	int reg_bit = 0, pixel = 0;
 	int halt_count = 0;
-	while (i < count) {
-		if (i > MODULE_COLS && halt_count < ROW_GAP) {
+	int module_count = 0;
+	while (reg_bit < count) {
+		if (pixel > MODULE_COLS*module_count && halt_count < ROW_GAP) {
 			++halt_count;
-			--i;
 		}
-		/* count-i-1 because the first bit needs to go last */
-		sreg_push_bit(ROW, ISBITSET(data, (count-i-1)));
-		++i;
+		else {
+			pixel++;
+		}
+		if (halt_count == ROW_GAP) {
+			halt_count = 0;
+			module_count++;
+		}
+		reg_bit++;
+		sreg_push_bit(ROW, ISBITSET(data, DISP_COLS-pixel));
 	}
 }
 
