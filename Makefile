@@ -153,6 +153,10 @@ endif
 .PHONY: all
 .SILENT: all
 
+
+program: all
+	avrdude -p m32 -P usb -c avrisp2 -U flash:w:ethersex.hex
+
 ##############################################################################
 # logging to file make.log
 # calls make all and redirects stdout and stderr to make.log
